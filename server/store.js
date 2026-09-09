@@ -1,0 +1,249 @@
+// 轻量 JSON 文件存储：内存为真，防抖落盘
+// data/config.json          全局配置（AI 连接等）
+// data/projects/<id>.json   每本书完整数据（设定 + 章节 + 世界书）
+const fs = require('fs')
+const path = require('path')
+const crypto = require('crypto')
+
+const DATA_DIR = path.join(__dirname, '..', 'data')
+const CONFIG_FILE = path.join(DATA_DIR, 'config.json')
+const PROJECTS_DIR = path.join(DATA_DIR, 'projects')
+
+const DEFAULT_CONFIG = {
+  baseUrl: 'https://api.openai.com/v1',
+  apiKey: '',
+  model: '',
+  extractModel: '', // 留空则抽取复用主模型
+  temperature: 0.8,
+  maxTokens: 2000
+}
+
+const DEFAULT_SETTINGS = {
+  systemPrompt: '',
+  storyBible: '',
+  authorNote: '',
+  authorNoteDepth: 1, // 插入到上下文倒数第 N 段之前
+  contextChars: 12000,
+  scanChars: 4000,
+  autoExtract: true
+}
+
+const config = { ...DEFAULT_CONFIG }
+const projects = new Map() // id -> project
+const saveTimers = new Map() // id -> timer
+
+function uid() {
+  return Date.now().toString(36) + crypto.randomBytes(4).toString('hex')
+}
+
+function cnNum(n) {
+  const d = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
+  if (n <= 0) return d[0]
+  if (n < 10) return d[n]
+  if (n === 10) return '十'
+  if (n < 20) return '十' + d[n % 10]
+  if (n < 100) return d[Math.floor(n / 10)] + '十' + (n % 10 ? d[n % 10] : '')
+  return String(n)
+}
+
+function chapterTitle(index) {
+  return `第${cnNum(index + 1)}章`
+}
+
+function readJson(file, fallback) {
+  try {
+    const raw = fs.readFileSync(file, 'utf8')
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+function ensureDirs() {
+  fs.mkdirSync(PROJECTS_DIR, { recursive: true })
+}
+
+function load() {
+  ensureDirs()
+  const saved = readJson(CONFIG_FILE, null)
+  if (saved) Object.assign(config, saved)
+  for (const f of fs.readdirSync(PROJECTS_DIR)) {
+    if (!f.endsWith('.json')) continue
+    const p = readJson(path.join(PROJECTS_DIR, f), null)
+    if (p && p.id) {
+      p.settings = { ...DEFAULT_SETTINGS, ...(p.settings || {}) }
+      p.chapters = p.chapters || []
+      p.worldbook = p.worldbook || []
+      projects.set(p.id, p)
+    }
+  }
+}
+
+function saveConfig() {
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2))
+}
+
+function projectFile(id) {
+  return path.join(PROJECTS_DIR, id + '.json')
+}
+
+function saveProjectNow(id) {
+  const p = projects.get(id)
+  if (!p) return
+  ensureDirs()
+  fs.writeFileSync(projectFile(id), JSON.stringify(p, null, 2))
+}
+
+function queueSaveProject(id) {
+  clearTimeout(saveTimers.get(id))
+  saveTimers.set(id, setTimeout(() => {
+    saveTimers.delete(id)
+    saveProjectNow(id)
+  }, 300))
+}
+
+function getConfig() {
+  return { ...config, apiKey: config.apiKey ? '●'.repeat(8) : '' }
+}
+
+function updateConfig(patch) {
+  // apiKey 传掩码或空值时保留原值
+  const { apiKey, ...rest } = patch || {}
+  Object.assign(config, rest)
+  if (apiKey && !/^[●]+$/.test(apiKey)) config.apiKey = apiKey
+  if (apiKey === '') config.apiKey = ''
+  saveConfig()
+  return getConfig()
+}
+
+function listProjects() {
+  return [...projects.values()]
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .map(p => ({
+      id: p.id,
+      name: p.name,
+      updatedAt: p.updatedAt,
+      chapterCount: p.chapters.length,
+      worldbookCount: p.worldbook.length,
+      totalChars: p.chapters.reduce((s, c) => s + (c.content || '').length, 0)
+    }))
+}
+
+function getProject(id) {
+  return projects.get(id) || null
+}
+
+function createProject(name) {
+  const p = {
+    id: uid(),
+    name: name || '未命名作品',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    settings: { ...DEFAULT_SETTINGS },
+    chapters: [{ id: uid(), title: chapterTitle(0), content: '', order: 0, createdAt: Date.now(), updatedAt: Date.now() }],
+    worldbook: []
+  }
+  projects.set(p.id, p)
+  saveProjectNow(p.id)
+  return p
+}
+
+function deleteProject(id) {
+  clearTimeout(saveTimers.get(id))
+  saveTimers.delete(id)
+  projects.delete(id)
+  try { fs.unlinkSync(projectFile(id)) } catch {}
+}
+
+function touch(p) {
+  p.updatedAt = Date.now()
+  queueSaveProject(p.id)
+}
+
+// ---------- 章节 ----------
+function findChapter(p, cid) {
+  return p.chapters.find(c => c.id === cid) || null
+}
+
+function addChapter(p, title) {
+  const c = {
+    id: uid(),
+    title: title || chapterTitle(p.chapters.length),
+    content: '',
+    order: p.chapters.length,
+    createdAt: Date.now(),
+    updatedAt: Date.now()
+  }
+  p.chapters.push(c)
+  touch(p)
+  return c
+}
+
+function updateChapter(p, cid, patch) {
+  const c = findChapter(p, cid)
+  if (!c) return null
+  if (patch.title !== undefined) c.title = patch.title
+  if (patch.content !== undefined) c.content = patch.content
+  c.updatedAt = Date.now()
+  touch(p)
+  return c
+}
+
+function deleteChapter(p, cid) {
+  p.chapters = p.chapters.filter(c => c.id !== cid)
+  p.chapters.forEach((c, i) => { c.order = i })
+  touch(p)
+}
+
+// ---------- 世界书 ----------
+function normalizeEntry(e) {
+  return {
+    id: e.id || uid(),
+    type: ['character', 'item', 'location', 'organization', 'lore', 'other'].includes(e.type) ? e.type : 'other',
+    name: (e.name || '').trim(),
+    aliases: Array.isArray(e.aliases) ? e.aliases.filter(Boolean) : [],
+    content: e.content || '',
+    keywords: Array.isArray(e.keywords) ? e.keywords.filter(Boolean) : [],
+    enabled: e.enabled !== false,
+    pinned: !!e.pinned,
+    position: e.position === 'before' ? 'before' : 'after',
+    priority: Number.isFinite(+e.priority) ? +e.priority : 100,
+    auto: !!e.auto,
+    mentions: e.mentions || 0,
+    createdAt: e.createdAt || Date.now(),
+    updatedAt: Date.now()
+  }
+}
+
+function addEntry(p, entry) {
+  const e = normalizeEntry({ ...entry, id: undefined })
+  if (!e.name) return null
+  p.worldbook.push(e)
+  touch(p)
+  return e
+}
+
+function updateEntry(p, eid, patch) {
+  const i = p.worldbook.findIndex(e => e.id === eid)
+  if (i < 0) return null
+  const merged = normalizeEntry({ ...p.worldbook[i], ...patch, id: p.worldbook[i].id, createdAt: p.worldbook[i].createdAt })
+  p.worldbook[i] = merged
+  touch(p)
+  return merged
+}
+
+function deleteEntry(p, eid) {
+  p.worldbook = p.worldbook.filter(e => e.id !== eid)
+  touch(p)
+}
+
+function rawConfig() {
+  return config
+}
+
+module.exports = {
+  load, saveConfig, getConfig, rawConfig, updateConfig,
+  listProjects, getProject, createProject, deleteProject,
+  findChapter, addChapter, updateChapter, deleteChapter,
+  addEntry, updateEntry, deleteEntry, normalizeEntry, touch
+}

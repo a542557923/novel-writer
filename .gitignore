@@ -1,0 +1,14 @@
+# 依赖与构建产物（clone 后可重新生成）
+node_modules/
+dist/
+
+# 用户数据：包含 API Key 和全部小说内容，严禁上传！
+data/
+
+# 系统与日志
+.DS_Store
+Thumbs.db
+*.log
+
+# TRAE IDE 生成物
+.trae-html-share-packages/
