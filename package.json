@@ -1,6 +1,5 @@
 {
   "name": "novel-writer",
-  "version": "0.1.0",
   "private": true,
   "description": "轻量 AI 小说写作工具：ST 式提示词编排 + 世界书自动抽取注入",
   "scripts": {

@@ -89,7 +89,12 @@ function ProjectForm({ project, onSave }) {
 
   return (
     <>
-      <label>系统提示词（{DEFAULT_SYSTEM_PROMPT_HINT}）</label>
+      {s.presetId && (
+        <div className="preset-active-hint">
+          本书已启用「酒馆预设」：下方<b>系统提示词</b>将注入预设的 main 占位符（留空则不注入，不回退默认提示词）；<b>大纲</b>注入 scenario；<b>作者注</b>仍随正文上下文生效。
+        </div>
+      )}
+      <label>系统提示词（{s.presetId ? '作为预设 main 占位符的数据源' : DEFAULT_SYSTEM_PROMPT_HINT}）</label>
       <textarea rows={6} value={systemPrompt} onChange={e => setSystemPrompt(e.target.value)} />
       <label>本书大纲 / 核心世界观（每次生成都注入）</label>
       <textarea rows={8} value={storyBible} onChange={e => setStoryBible(e.target.value)} placeholder="题材、主线、力量体系、结局走向…" />

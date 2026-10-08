@@ -252,3 +252,57 @@ body {
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: #333944; border-radius: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- 酒馆预设 ---------- */
+.preset-bind {
+  background: var(--panel2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; margin-bottom: 10px;
+}
+.preset-bind-label { display: block; font-size: 12.5px; color: var(--accent-h); margin-bottom: 6px; }
+.preset-bind select { width: 100%; }
+.preset-names { display: flex; gap: 10px; margin-top: 8px; }
+.preset-names label { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.preset-names label span { font-size: 11.5px; color: var(--muted); }
+.preset-hint {
+  margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.6;
+  background: var(--panel); border-radius: 6px; padding: 6px 8px;
+}
+.preset-lib-item {
+  border: 1px solid var(--border); border-radius: 8px; background: var(--panel2);
+  margin-bottom: 8px; overflow: hidden;
+}
+.preset-lib-row {
+  display: flex; align-items: center; gap: 8px; padding: 9px 12px; cursor: pointer;
+}
+.preset-lib-row:hover { background: var(--panel); }
+.preset-editor { border-top: 1px solid var(--border); padding: 8px 10px 10px; }
+.preset-editor-note {
+  font-size: 11px; color: var(--muted); margin-bottom: 8px; line-height: 1.5;
+}
+.preset-item { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 6px; background: var(--panel); }
+.preset-item.disabled .preset-name { color: var(--muted); }
+.preset-item-row {
+  display: flex; align-items: center; gap: 7px; padding: 7px 10px; cursor: pointer; flex-wrap: wrap;
+}
+.preset-item-row:hover { background: var(--panel2); }
+.preset-idx { font-size: 11px; color: var(--muted); min-width: 18px; text-align: right; }
+.preset-name { font-size: 12.5px; }
+.chip.role { font-size: 10px; padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border); color: var(--muted); }
+.chip.role.role-system { color: #9a8fd8; border-color: #4a4470; }
+.chip.role.role-user { color: #6fa8d8; border-color: #33506b; }
+.chip.role.role-assistant { color: #d89f6f; border-color: #6b4f35; }
+.chip.pmarker { color: var(--ok); border-color: #3d5137; }
+.preset-marker-note {
+  font-size: 11.5px; color: var(--muted); padding: 6px 10px 8px; line-height: 1.5;
+}
+.preset-content-editor {
+  width: 100%; min-height: 160px; font-size: 12px; line-height: 1.6;
+  background: var(--bg); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 8px 10px; resize: vertical; font-family: inherit;
+}
+.preset-active-hint {
+  font-size: 11.5px; color: var(--accent-h); line-height: 1.6;
+  background: var(--panel2); border: 1px dashed var(--accent);
+  border-radius: 6px; padding: 7px 10px; margin-bottom: 10px;
+}
+

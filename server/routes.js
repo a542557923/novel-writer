@@ -2,6 +2,7 @@
 const express = require('express')
 const store = require('./store')
 const { buildPrompt } = require('./prompt')
+const { buildPresetMessages, createOutputFilter } = require('./preset')
 const { chatStream } = require('./llm')
 const { extract, applyExtraction } = require('./extractor')
 
@@ -16,6 +17,29 @@ const wrap = fn => (req, res) => {
 // ---------- 配置 ----------
 router.get('/config', (req, res) => res.json(store.getConfig()))
 router.put('/config', wrap((req, res) => res.json(store.updateConfig(req.body))))
+
+// ---------- 酒馆预设库（全局） ----------
+router.get('/presets', (req, res) => res.json(store.listPresets()))
+router.get('/presets/:pid', (req, res) => {
+  const ps = store.getPreset(req.params.pid)
+  if (!ps) return res.status(404).json({ error: '预设不存在' })
+  res.json(ps)
+})
+router.post('/presets', wrap((req, res) => {
+  const body = req.body || {}
+  // 支持两种：{ name, data: ST原始JSON } 包装，或直接 ST 原始 JSON
+  const raw = (body.data && typeof body.data === 'object') ? body.data : body
+  res.json(store.createPreset(raw, body.name))
+}))
+router.put('/presets/:pid', wrap((req, res) => {
+  const ps = store.updatePreset(req.params.pid, req.body || {})
+  if (!ps) return res.status(404).json({ error: '预设不存在' })
+  res.json(ps)
+}))
+router.delete('/presets/:pid', (req, res) => {
+  store.deletePreset(req.params.pid)
+  res.json({ ok: true })
+})
 
 // ---------- 项目 ----------
 router.get('/projects', (req, res) => res.json(store.listProjects()))
@@ -99,7 +123,10 @@ router.post('/projects/:id/preview', wrap((req, res) => {
   const { chapterId, mode, selection, instruction } = req.body || {}
   const chapter = store.findChapter(p, chapterId)
   if (!chapter) return res.status(400).json({ error: '请选择章节' })
-  res.json(buildPrompt({ project: p, chapter, mode, selection, instruction }))
+  const presetObj = p.settings.presetId ? store.getPreset(p.settings.presetId) : null
+  res.json(presetObj
+    ? buildPresetMessages({ preset: presetObj, project: p, chapter, mode, selection, instruction, charName: p.settings.presetCharName, userName: p.settings.presetUserName })
+    : buildPrompt({ project: p, chapter, mode, selection, instruction }))
 }))
 
 // ---------- 生成（SSE 流式） ----------
@@ -110,7 +137,10 @@ router.post('/projects/:id/generate', wrap(async (req, res) => {
   const chapter = store.findChapter(p, chapterId)
   if (!chapter) return res.status(400).json({ error: '请选择章节' })
 
-  const built = buildPrompt({ project: p, chapter, mode, selection, instruction })
+  const presetObj = p.settings.presetId ? store.getPreset(p.settings.presetId) : null
+  const built = presetObj
+    ? buildPresetMessages({ preset: presetObj, project: p, chapter, mode, selection, instruction, charName: p.settings.presetCharName, userName: p.settings.presetUserName })
+    : buildPrompt({ project: p, chapter, mode, selection, instruction })
   const cfg = store.rawConfig()
 
   res.setHeader('Content-Type', 'text/event-stream; charset=utf-8')
@@ -131,17 +161,30 @@ router.post('/projects/:id/generate', wrap(async (req, res) => {
   // 注意：Node 18+ 里 req 的 close 在请求体读完后就会触发，不能用它判断断开
   res.on('close', () => { if (!res.writableEnded) controller.abort() })
 
+  // 预设模式：流式剥离 <thinking> 块与 <Interleaving> 标签（cleaned 为唯一真源，与 chunk 流一致）
+  const filter = (presetObj && presetObj.cleanOutput !== false) ? createOutputFilter() : null
+  let cleaned = ''
+
   try {
     const text = await chatStream(cfg, {
       messages: built.messages,
       signal: controller.signal,
-      onChunk: c => send('chunk', { text: c })
+      onChunk: c => {
+        if (!filter) { send('chunk', { text: c }); return }
+        const out = filter.push(c)
+        if (out) { cleaned += out; send('chunk', { text: out }) }
+      }
     })
-    send('done', { text, stats: built.stats })
-    if (p.settings.autoExtract && text.trim()) {
+    if (filter) {
+      const tail = filter.end()
+      if (tail) { cleaned += tail; send('chunk', { text: tail }) }
+    }
+    const finalText = filter ? cleaned : text
+    send('done', { text: finalText, stats: built.stats })
+    if (p.settings.autoExtract && finalText.trim()) {
       send('extract-start', {})
       try {
-        const result = await extract(cfg, p, text, null)
+        const result = await extract(cfg, p, finalText, null)
         const applied = applyExtraction(p, result)
         if (applied.added.length || applied.updated.length) store.touch(p)
         send('extract', applied)

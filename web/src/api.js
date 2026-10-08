@@ -37,7 +37,15 @@ export const api = {
   deleteEntry: (id, eid) => fetch(`/api/projects/${id}/worldbook/${eid}`, { method: 'DELETE' }).then(j),
 
   preview: (id, body) => post(`/api/projects/${id}/preview`, body),
-  extract: (id, body) => post(`/api/projects/${id}/extract`, body)
+  extract: (id, body) => post(`/api/projects/${id}/extract`, body),
+
+  listPresets: () => fetch('/api/presets').then(j),
+  getPreset: (pid) => fetch(`/api/presets/${pid}`).then(j),
+  importPreset: (raw, name) => post('/api/presets', { name, data: raw }),
+  updatePreset: (pid, patch) => fetch(`/api/presets/${pid}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
+  }).then(j),
+  deletePreset: (pid) => fetch(`/api/presets/${pid}`, { method: 'DELETE' }).then(j)
 }
 
 // SSE 生成流：返回 abort 函数

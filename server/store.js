@@ -1,13 +1,16 @@
 // 轻量 JSON 文件存储：内存为真，防抖落盘
 // data/config.json          全局配置（AI 连接等）
 // data/projects/<id>.json   每本书完整数据（设定 + 章节 + 世界书）
+// data/presets/<id>.json    全局酒馆预设库（SillyTavern 预设）
 const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
+const presetMod = require('./preset')
 
 const DATA_DIR = path.join(__dirname, '..', 'data')
 const CONFIG_FILE = path.join(DATA_DIR, 'config.json')
 const PROJECTS_DIR = path.join(DATA_DIR, 'projects')
+const PRESETS_DIR = path.join(DATA_DIR, 'presets')
 
 const DEFAULT_CONFIG = {
   baseUrl: 'https://api.openai.com/v1',
@@ -25,11 +28,15 @@ const DEFAULT_SETTINGS = {
   authorNoteDepth: 1, // 插入到上下文倒数第 N 段之前
   contextChars: 12000,
   scanChars: 4000,
-  autoExtract: true
+  autoExtract: true,
+  presetId: '', // 绑定的全局酒馆预设；空 = 不使用
+  presetCharName: '', // 预设 {{char}} 的本书映射
+  presetUserName: '' // 预设 {{user}} 的本书映射
 }
 
 const config = { ...DEFAULT_CONFIG }
 const projects = new Map() // id -> project
+const presets = new Map() // id -> preset
 const saveTimers = new Map() // id -> timer
 
 function uid() {
@@ -61,12 +68,18 @@ function readJson(file, fallback) {
 
 function ensureDirs() {
   fs.mkdirSync(PROJECTS_DIR, { recursive: true })
+  fs.mkdirSync(PRESETS_DIR, { recursive: true })
 }
 
 function load() {
   ensureDirs()
   const saved = readJson(CONFIG_FILE, null)
   if (saved) Object.assign(config, saved)
+  for (const f of fs.readdirSync(PRESETS_DIR)) {
+    if (!f.endsWith('.json')) continue
+    const ps = presetMod.normalizePreset(readJson(path.join(PRESETS_DIR, f), null))
+    if (ps && ps.id) presets.set(ps.id, ps)
+  }
   for (const f of fs.readdirSync(PROJECTS_DIR)) {
     if (!f.endsWith('.json')) continue
     const p = readJson(path.join(PROJECTS_DIR, f), null)
@@ -241,9 +254,61 @@ function rawConfig() {
   return config
 }
 
+// ---------- 酒馆预设库（全局） ----------
+function presetFile(id) {
+  return path.join(PRESETS_DIR, id + '.json')
+}
+
+function savePresetNow(ps) {
+  ensureDirs()
+  fs.writeFileSync(presetFile(ps.id), JSON.stringify(ps, null, 2))
+}
+
+function listPresets() {
+  return [...presets.values()]
+    .sort((a, b) => b.importedAt - a.importedAt)
+    .map(ps => ({ id: ps.id, name: ps.name, promptCount: ps.prompts.length, importedAt: ps.importedAt }))
+}
+
+function getPreset(id) {
+  return presets.get(id) || null
+}
+
+function createPreset(raw, name) {
+  const ps = presetMod.parsePreset(raw)
+  ps.id = uid()
+  if (name && String(name).trim()) ps.name = String(name).trim()
+  presets.set(ps.id, ps)
+  savePresetNow(ps)
+  return ps
+}
+
+function updatePreset(id, patch) {
+  const ps = presets.get(id)
+  if (!ps) return null
+  const { prompts, name, cleanOutput } = patch || {}
+  if (name !== undefined && String(name).trim()) ps.name = String(name).trim()
+  if (cleanOutput !== undefined) ps.cleanOutput = !!cleanOutput
+  for (const u of Array.isArray(prompts) ? prompts : []) {
+    if (!u || typeof u.identifier !== 'string') continue
+    const t = ps.prompts.find(x => x.identifier === u.identifier)
+    if (!t) continue
+    if (u.enabled !== undefined) t.enabled = !!u.enabled
+    if (u.content !== undefined) t.content = String(u.content)
+  }
+  savePresetNow(ps)
+  return ps
+}
+
+function deletePreset(id) {
+  presets.delete(id)
+  try { fs.unlinkSync(presetFile(id)) } catch {}
+}
+
 module.exports = {
   load, saveConfig, getConfig, rawConfig, updateConfig,
   listProjects, getProject, createProject, deleteProject,
   findChapter, addChapter, updateChapter, deleteChapter,
-  addEntry, updateEntry, deleteEntry, normalizeEntry, touch
+  addEntry, updateEntry, deleteEntry, normalizeEntry, touch,
+  listPresets, getPreset, createPreset, updatePreset, deletePreset
 }

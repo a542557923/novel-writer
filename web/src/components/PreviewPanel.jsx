@@ -39,6 +39,7 @@ export default function PreviewPanel({ project, chapterId }) {
       {data && (
         <>
           <div className="preview-stats">
+            {data.stats.preset && <span>预设「{data.stats.presetName}」· {data.stats.messageCount} 条消息</span>}
             <span>注入 {data.stats.usedEntries} 条设定</span>
             <span>上下文 {data.stats.contextChars.toLocaleString()} 字</span>
             <span>提示词共 {data.stats.totalChars.toLocaleString()} 字</span>
@@ -52,10 +53,17 @@ export default function PreviewPanel({ project, chapterId }) {
               </span>
             ))}
           </div>
-          <PromptOrderHint />
+          {data.stats.preset ? (
+            <div className="order-hint">组装顺序：按预设 prompt_order（含宏展开与绝对注入）</div>
+          ) : (
+            <PromptOrderHint />
+          )}
           {data.messages.map((m, i) => (
             <details key={i} open={i === 0} className="preview-msg">
-              <summary>{m.role === 'system' ? '① System（设定区）' : '② User（上下文 + 指令）'}</summary>
+              <summary>
+                {m.role === 'system' ? 'System' : m.role === 'user' ? 'User' : 'Assistant'} · 第 {i + 1} 条 · {m.content.length.toLocaleString()} 字
+                {m.role === 'assistant' && i === data.messages.length - 1 && data.messages.length > 1 ? '（prefill）' : ''}
+              </summary>
               <pre>{m.content}</pre>
             </details>
           ))}

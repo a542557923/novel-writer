@@ -12,3 +12,6 @@ Thumbs.db
 
 # TRAE IDE 生成物
 .trae-html-share-packages/
+
+# 第三方数据集/示例素材（体积大，与项目代码无关）
+Kemini_Dramatron_v3.1.json
