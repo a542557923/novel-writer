@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { api } from '../api.js'
+import { APP_VERSION } from '../version.js'
 
 const DEFAULT_SYSTEM_PROMPT_HINT = '留空使用内置默认提示词（小说家角色 + 直出正文 + 设定一致性等要求）'
 
@@ -12,6 +13,7 @@ export default function SettingsPanel({ project, onSaveSettings, onSaveConfig })
       <Section title={`《${project.name}》写作设置`}>
         <ProjectForm project={project} onSave={onSaveSettings} />
       </Section>
+      <div className="version-line">Novel Writer v{APP_VERSION}</div>
     </div>
   )
 }
@@ -57,7 +59,7 @@ function ConfigForm({ onSave }) {
       <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="sk-…" />
       <label>模型</label>
       <input value={model} onChange={e => setModel(e.target.value)} placeholder="deepseek-chat / gpt-4o / …" />
-      <label>抽取模型（可选，留空用主模型；建议用便宜快速的小模型做实体抽取）</label>
+      <label>抽取模型（可选，留空复用主模型；额度充裕时留空即可，使用推理模型写作或额度受限时建议单独指定）</label>
       <input value={extractModel} onChange={e => setExtractModel(e.target.value)} placeholder="同上，可留空" />
       <div className="entry-editor-row">
         <div>
@@ -85,7 +87,9 @@ function ProjectForm({ project, onSave }) {
   const [authorNoteDepth, setAuthorNoteDepth] = useState(s.authorNoteDepth ?? 1)
   const [contextChars, setContextChars] = useState(s.contextChars ?? 12000)
   const [scanChars, setScanChars] = useState(s.scanChars ?? 4000)
+  const [recentChapters, setRecentChapters] = useState(s.recentChapters ?? 2)
   const [autoExtract, setAutoExtract] = useState(s.autoExtract !== false)
+  const [thriftyMode, setThriftyMode] = useState(s.thriftyMode === true)
 
   return (
     <>
@@ -110,20 +114,36 @@ function ProjectForm({ project, onSave }) {
           <input type="number" step="1000" value={contextChars} onChange={e => setContextChars(+e.target.value)} />
         </div>
         <div>
+          <label>近章原文数</label>
+          <input type="number" min="0" max="10" value={recentChapters} onChange={e => setRecentChapters(+e.target.value)} />
+        </div>
+        <div>
           <label>世界书扫描窗口（字符）</label>
           <input type="number" step="500" value={scanChars} onChange={e => setScanChars(+e.target.value)} />
         </div>
       </div>
+      <div className="order-hint">
+        分层记忆：近 <b>{recentChapters}</b> 章用原文注入，更早章节用摘要注入（在「记忆」面板管理与补建）；
+        上下文预算按「当前章 ≤50% · 近章 ≤25% · 摘要余量」分配。原文永久保留，摘要只做导航。
+      </div>
       <label className="check">
-        <input type="checkbox" checked={autoExtract} onChange={e => setAutoExtract(e.target.checked)} />
-        生成后自动抽取新实体入库（世界书自动生长）
+        <input type="checkbox" checked={autoExtract && !thriftyMode} disabled={thriftyMode}
+          onChange={e => setAutoExtract(e.target.checked)} />
+        生成后自动整理（世界书抽取 + 章节摘要，合并为一次请求，串行后台执行）
       </label>
+      <label className="check">
+        <input type="checkbox" checked={thriftyMode} onChange={e => setThriftyMode(e.target.checked)} />
+        省流模式（公益站友好）：关闭全部后台任务，每次生成严格仅 1 次请求
+      </label>
+      {thriftyMode && (
+        <div className="order-hint">省流模式下不会自动抽取世界书、不会生成摘要；可在「记忆」面板手动补建摘要。</div>
+      )}
       <button
         className="btn primary"
         onClick={() => onSave({
           systemPrompt: systemPrompt.trim(), storyBible: storyBible.trim(),
           authorNote: authorNote.trim(), authorNoteDepth,
-          contextChars, scanChars, autoExtract
+          contextChars, scanChars, recentChapters, autoExtract, thriftyMode
         })}
       >保存本书设置</button>
     </>

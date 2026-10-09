@@ -39,6 +39,13 @@ export const api = {
   preview: (id, body) => post(`/api/projects/${id}/preview`, body),
   extract: (id, body) => post(`/api/projects/${id}/extract`, body),
 
+  getMemory: (id) => fetch(`/api/projects/${id}/memory`).then(j),
+  rebuildMemory: (id) => post(`/api/projects/${id}/memory/rebuild`, {}),
+  foldMemory: (id) => post(`/api/projects/${id}/memory/fold`, {}),
+
+  listRequests: (id) => fetch(`/api/projects/${id}/requests`).then(j),
+  getRequest: (id, rid) => fetch(`/api/projects/${id}/requests/${rid}`).then(j),
+
   listPresets: () => fetch('/api/presets').then(j),
   getPreset: (pid) => fetch(`/api/presets/${pid}`).then(j),
   importPreset: (raw, name) => post('/api/presets', { name, data: raw }),
@@ -78,6 +85,7 @@ export function streamGenerate(projectId, body, handlers) {
       if (ev === 'chunk') handlers.onChunk?.(data.text)
       else if (ev === 'meta') handlers.onMeta?.(data)
       else if (ev === 'done') handlers.onDone?.(data)
+      else if (ev === 'postprocess-queued') handlers.onPostprocessQueued?.(data)
       else if (ev === 'extract-start') handlers.onExtractStart?.()
       else if (ev === 'extract') handlers.onExtract?.(data)
       else if (ev === 'extract-error') handlers.onExtractError?.(data)

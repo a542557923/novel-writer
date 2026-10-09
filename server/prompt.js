@@ -18,7 +18,7 @@ function buildPrompt({ project, chapter, mode = 'continue', selection = '', inst
   const sysPrompt = settings.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT
 
   // ---- 上下文 ----
-  const { contextText } = buildContextText({ project, chapter, mode, selection })
+  const { contextText, breakdown } = buildContextText({ project, chapter, mode, selection })
 
   // ---- 世界书扫描 ----
   const { pinned, wiBefore, wiAfter, scanWindow } = scanWorldbook(project, contextText)
@@ -60,7 +60,8 @@ function buildPrompt({ project, chapter, mode = 'continue', selection = '', inst
       systemChars: systemText.length,
       totalChars: systemText.length + userText.length,
       usedEntries: usedEntries.length,
-      scanWindow
+      scanWindow,
+      contextBreakdown: breakdown
     }
   }
 }

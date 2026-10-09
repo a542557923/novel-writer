@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar.jsx'
 import Editor from './components/Editor.jsx'
 import WorldBook from './components/WorldBook.jsx'
 import PresetPanel from './components/PresetPanel.jsx'
+import MemoryPanel from './components/MemoryPanel.jsx'
 import PreviewPanel from './components/PreviewPanel.jsx'
 import SettingsPanel from './components/SettingsPanel.jsx'
 
@@ -173,12 +174,15 @@ export default function App() {
         />
         <aside className="right-panel">
           <div className="tabs">
-            {[['worldbook', '世界书'], ['preset', '预设'], ['preview', '注入预览'], ['settings', '设置']].map(([k, label]) => (
+            {[['worldbook', '世界书'], ['memory', '记忆'], ['preset', '预设'], ['preview', '注入预览'], ['settings', '设置']].map(([k, label]) => (
               <button key={k} className={'tab' + (tab === k ? ' active' : '')} onClick={() => setTab(k)}>{label}</button>
             ))}
           </div>
           {tab === 'worldbook' && (
             <WorldBook project={project} onPatch={patchProject} toast={toast} />
+          )}
+          {tab === 'memory' && (
+            <MemoryPanel project={project} toast={toast} />
           )}
           {tab === 'preset' && (
             <PresetPanel project={project} onPatch={patchProject} toast={toast} />

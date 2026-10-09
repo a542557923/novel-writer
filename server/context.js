@@ -1,4 +1,6 @@
 // 提示词组装的共享纯函数：正文上下文、世界书扫描、条目格式化（prompt.js 与 preset.js 共用）
+const { buildMemoryBlock } = require('./memory')
+
 const TYPE_LABEL = {
   character: '人物', item: '物品', location: '地点',
   organization: '组织', lore: '设定', other: '其他'
@@ -33,39 +35,64 @@ function formatSection(title, entries) {
   return `# ${title}\n${sorted.map(formatEntry).join('\n\n')}`
 }
 
-// 上下文：前面章节尾部 + 当前章正文，按预算截断
+// 上下文：分层装配 —— 前情摘要（旧章压缩记忆）+ 近 N 章原文 + 当前章，按预算截断
+// 预算分配：当前章 ≤50%；近章 ≤25% + 当前章未用尽的份额；剩余全部给摘要层
 function buildContext(project, chapter) {
-  const budget = project.settings.contextChars || 12000
-  const parts = []
-  let used = 0
-  // 当前章（从后往前不可能超过一整章太多，直接取尾部）
+  const s = project.settings || {}
+  const budget = s.contextChars || 12000
+
+  // L0 当前章：取尾部，最多占预算 50%
   const cur = chapter.content || ''
-  let curText = cur
-  if (cur.length > budget) curText = cur.slice(-budget)
-  // 前面章节：从最近的往回，按尾部拼
+  const capCur = Math.floor(budget * 0.5)
+  const curText = cur.length > capCur ? cur.slice(-capCur) : cur
+
+  // L1 近 N 章原文：≤25% + 当前章未用尽的份额
+  const recentN = Math.max(0, Number.isFinite(+s.recentChapters) ? +s.recentChapters : 2)
   const prev = project.chapters.filter(c => c.order < chapter.order).sort((a, b) => b.order - a.order)
-  for (const c of prev) {
-    const remain = budget - curText.length
-    if (remain <= 300) break
+  const recentList = prev.slice(0, recentN)
+  let recentBudget = Math.floor(budget * 0.25) + Math.max(0, capCur - curText.length)
+  const recentParts = []
+  for (let i = 0; i < recentList.length; i++) {
+    if (recentBudget <= 200) break
+    const c = recentList[i]
     const body = c.content || ''
     if (!body) continue
-    const seg = body.length > remain ? body.slice(-remain) : body
-    parts.unshift(`《${c.title}》\n${seg}`)
-    used += seg.length
-    if (body.length > remain) break // 再往前已被截断，无需继续
+    const share = Math.max(Math.floor(recentBudget / (recentList.length - i)), 0)
+    const seg = body.length > share ? body.slice(-share) : body
+    recentParts.unshift(`《${c.title}》\n${seg}`)
+    recentBudget -= seg.length
   }
-  const prevText = parts.join('\n\n')
+  const recentText = recentParts.join('\n\n')
+
+  // L2 前情摘要层：剩余预算（旧章节的压缩记忆）
+  const memBudget = Math.max(0, budget - curText.length - recentText.length)
+  const mem = buildMemoryBlock(project, chapter, memBudget, recentN)
+
+  const contextText = [mem.text, recentText, curText].filter(Boolean).join('\n\n')
+  const breakdown = {
+    memoryChars: mem.text.length,
+    memoryUsed: mem.used,
+    memoryDropped: mem.dropped,
+    recentChars: recentText.length,
+    recentChapters: recentList.map(c => ({ title: c.title, total: (c.content || '').length })),
+    curChars: curText.length,
+    curTotal: cur.length,
+    olderCount: Math.max(0, prev.length - recentList.length)
+  }
   return {
-    prevText,
+    prevText: recentText,
     curText,
-    text: (prevText ? prevText + '\n\n' : '') + curText
+    memoryText: mem.text,
+    text: contextText,
+    breakdown
   }
 }
 
-// 组装正文上下文：expand/polish 用选中片段局部上下文，其余用全量上下文
+// 组装正文上下文：expand/polish 用选中片段局部上下文，其余用分层全量上下文
 function buildContextText({ project, chapter, mode = 'continue', selection = '' }) {
   let contextText
   let selectionBlock = ''
+  let breakdown = null
   if ((mode === 'expand' || mode === 'polish') && selection) {
     const cur = chapter.content || ''
     const at = cur.indexOf(selection)
@@ -77,10 +104,13 @@ function buildContextText({ project, chapter, mode = 'continue', selection = '' 
     blocks.push(selectionBlock)
     if (tail.trim()) blocks.push(`【片段后文】\n${tail}`)
     contextText = blocks.join('\n\n')
+    breakdown = { selection: true, contextChars: contextText.length }
   } else {
-    contextText = buildContext(project, chapter).text
+    const built = buildContext(project, chapter)
+    contextText = built.text
+    breakdown = built.breakdown
   }
-  return { contextText, selectionBlock }
+  return { contextText, selectionBlock, breakdown }
 }
 
 // 世界书扫描：常驻 + 触发（按扫描窗口匹配）

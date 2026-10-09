@@ -28,7 +28,9 @@ const DEFAULT_SETTINGS = {
   authorNoteDepth: 1, // 插入到上下文倒数第 N 段之前
   contextChars: 12000,
   scanChars: 4000,
-  autoExtract: true,
+  recentChapters: 2, // 近 N 章使用原文注入；更早章节使用摘要
+  autoExtract: true, // 生成后自动整理（世界书抽取 + 章节摘要，合并为一次请求）
+  thriftyMode: false, // 省流模式：关闭全部后台任务，每次生成仅 1 次请求（公益站友好）
   presetId: '', // 绑定的全局酒馆预设；空 = 不使用
   presetCharName: '', // 预设 {{char}} 的本书映射
   presetUserName: '' // 预设 {{user}} 的本书映射
@@ -87,6 +89,10 @@ function load() {
       p.settings = { ...DEFAULT_SETTINGS, ...(p.settings || {}) }
       p.chapters = p.chapters || []
       p.worldbook = p.worldbook || []
+      // 分层记忆结构（v1.0 新增）
+      if (!p.memory || typeof p.memory !== 'object') p.memory = {}
+      if (!p.memory.summaries || typeof p.memory.summaries !== 'object') p.memory.summaries = {}
+      if (!Array.isArray(p.memory.volumes)) p.memory.volumes = []
       projects.set(p.id, p)
     }
   }
@@ -154,7 +160,8 @@ function createProject(name) {
     updatedAt: Date.now(),
     settings: { ...DEFAULT_SETTINGS },
     chapters: [{ id: uid(), title: chapterTitle(0), content: '', order: 0, createdAt: Date.now(), updatedAt: Date.now() }],
-    worldbook: []
+    worldbook: [],
+    memory: { summaries: {}, volumes: [] }
   }
   projects.set(p.id, p)
   saveProjectNow(p.id)
@@ -205,6 +212,16 @@ function updateChapter(p, cid, patch) {
 function deleteChapter(p, cid) {
   p.chapters = p.chapters.filter(c => c.id !== cid)
   p.chapters.forEach((c, i) => { c.order = i })
+  // 级联清理分层记忆：删除该章摘要；从卷中移除，卷内不足 2 章时解散（章摘要保留可溯源）
+  if (p.memory && typeof p.memory === 'object') {
+    if (p.memory.summaries) delete p.memory.summaries[cid]
+    if (Array.isArray(p.memory.volumes)) {
+      p.memory.volumes = p.memory.volumes.filter(v => {
+        v.chapterIds = (Array.isArray(v.chapterIds) ? v.chapterIds : []).filter(id => id !== cid)
+        return v.chapterIds.length >= 2
+      })
+    }
+  }
   touch(p)
 }
 

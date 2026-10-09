@@ -97,10 +97,11 @@ export default function Editor({ project, chapter, onContent, toast, onWorldbook
         if (msg && !aborted) toast('生成失败: ' + msg)
         if (aborted) settle(undefined, true) // 中途停止：保留已生成部分
       },
+      onPostprocessQueued: () => setExtractInfo({ state: 'queued' }),
       onExtractStart: () => setExtractInfo({ state: 'running' }),
       onExtract: (d) => {
-        setExtractInfo({ state: 'done', added: d.added, updated: d.updated })
-        if (d.added.length || d.updated.length) onWorldbookChanged()
+        setExtractInfo({ state: 'done', added: d.added, updated: d.updated, summaryUpdated: d.summaryUpdated, folded: d.folded })
+        if (d.added.length || d.updated.length || d.summaryUpdated) onWorldbookChanged()
       },
       onExtractError: (e) => setExtractInfo({ state: 'error', message: e.message }),
       onEnd: () => setStreaming(false)
@@ -178,14 +179,16 @@ export default function Editor({ project, chapter, onContent, toast, onWorldbook
         <div className="gen-status">
           {meta && <span title="本次提示词注入的世界书条目数">注入 {meta.stats?.usedEntries ?? 0} 条设定</span>}
           {streaming && <span className="dot-pulse">生成中…</span>}
-          {extractInfo?.state === 'running' && <span className="dot-pulse">世界书抽取中…</span>}
+          {extractInfo?.state === 'queued' && <span className="dot-pulse" title="后台任务串行执行，间隔数秒，用户可继续操作">后台整理排队中…</span>}
+          {extractInfo?.state === 'running' && <span className="dot-pulse">世界书与摘要整理中…</span>}
           {extractInfo?.state === 'done' && (
             <span className="extract-ok">
-              ✦ 新增 {extractInfo.added.map(a => a.name).join('、') || '无'}
-              {extractInfo.updated.length ? `；更新 ${extractInfo.updated.map(u => u.name).join('、')}` : ''}
+              ✦ {extractInfo.added?.length ? `新增 ${extractInfo.added.map(a => a.name).join('、')}` : '无新增'}
+              {extractInfo.updated?.length ? `；更新 ${extractInfo.updated.map(u => u.name).join('、')}` : ''}
+              {extractInfo.summaryUpdated ? '；摘要已更新' : ''}
             </span>
           )}
-          {extractInfo?.state === 'error' && <span className="extract-err" title={extractInfo.message}>抽取失败</span>}
+          {extractInfo?.state === 'error' && <span className="extract-err" title={extractInfo.message}>后台整理失败</span>}
         </div>
       </div>
 

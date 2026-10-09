@@ -136,7 +136,7 @@ function expandContent(content, vars, names, depthGuard = 0) {
 // 返回结构与 buildPrompt 同构：{ messages, usedEntries, stats }
 function buildPresetMessages({ preset, project, chapter, mode = 'continue', selection = '', instruction = '', charName = '', userName = '' }) {
   const settings = project.settings
-  const { contextText } = buildContextText({ project, chapter, mode, selection })
+  const { contextText, breakdown } = buildContextText({ project, chapter, mode, selection })
   const { pinned, wiBefore, wiAfter, scanWindow } = scanWorldbook(project, contextText)
   const { text: historyText } = injectAuthorNote(contextText, settings.authorNote, settings.authorNoteDepth)
 
@@ -217,7 +217,8 @@ function buildPresetMessages({ preset, project, chapter, mode = 'continue', sele
       totalChars: messages.reduce((s, m) => s + m.content.length, 0),
       usedEntries: usedEntries.length,
       scanWindow,
-      activeMarkers
+      activeMarkers,
+      contextBreakdown: breakdown
     }
   }
 }
