@@ -11,6 +11,16 @@ export default function SettingsPanel({ project, onSaveSettings, onSaveConfig, t
       <Section title="自动处理" desc="仅影响当前作品">
         <ProcessForm project={project} onSave={onSaveSettings} />
       </Section>
+
+      <details className="settings-section collapse">
+        <summary>
+          <span className="collapse-title">高级</span>
+          <span className="collapse-sub">系统提示词 / 本书大纲</span>
+          <span className="chev">›</span>
+        </summary>
+        <AdvancedForm project={project} onSave={onSaveSettings} />
+      </details>
+
       <div className="version-line">Novel Writer v{APP_VERSION}</div>
     </div>
   )
@@ -131,6 +141,47 @@ function ConfigForm({ onSave, toast }) {
 
       <button className="btn primary block" onClick={save} disabled={saving}>
         {saving ? '保存中…' : '保存配置'}
+      </button>
+    </>
+  )
+}
+
+// 高级：系统提示词 / 本书大纲（默认折叠）
+function AdvancedForm({ project, onSave }) {
+  const s = project.settings
+  const [systemPrompt, setSystemPrompt] = useState(s.systemPrompt || '')
+  const [storyBible, setStoryBible] = useState(s.storyBible || '')
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    setSaving(true)
+    try { await onSave({ systemPrompt: systemPrompt.trim(), storyBible: storyBible.trim() }) }
+    finally { setSaving(false) }
+  }
+
+  return (
+    <>
+      {s.presetId && (
+        <div className="hint-line">
+          已启用酒馆预设：系统提示词填入预设的 <b>main</b> 占位符，大纲填入 <b>scenario</b>；留空则不注入。
+        </div>
+      )}
+      <label>系统提示词</label>
+      <textarea
+        rows={6}
+        value={systemPrompt}
+        onChange={e => setSystemPrompt(e.target.value)}
+        placeholder="留空则使用内置默认提示词（启用预设时留空 = 不注入 main）"
+      />
+      <label>本书大纲 / 核心世界观（每次生成都注入）</label>
+      <textarea
+        rows={8}
+        value={storyBible}
+        onChange={e => setStoryBible(e.target.value)}
+        placeholder="题材、主线、力量体系、结局走向…"
+      />
+      <button className="btn primary block" onClick={save} disabled={saving}>
+        {saving ? '保存中…' : '保存高级设置'}
       </button>
     </>
   )

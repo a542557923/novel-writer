@@ -393,6 +393,20 @@ select { cursor: pointer; }
 .section-head > span { font-size: 11px; color: var(--muted); }
 .settings-section label { color: var(--muted); font-size: 12px; display: block; margin: 12px 0 6px; }
 .settings-section label:first-of-type { margin-top: 0; }
+
+/* 折叠的高级设置 */
+.settings-section.collapse { padding: 14px 16px; }
+.settings-section.collapse > summary {
+  list-style: none; cursor: pointer;
+  display: flex; align-items: center; gap: 8px;
+}
+.settings-section.collapse > summary::-webkit-details-marker { display: none; }
+.settings-section.collapse[open] > summary { margin-bottom: 10px; }
+.collapse-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.collapse-sub { font-size: 11px; color: var(--muted); }
+.chev { margin-left: auto; color: var(--muted); font-size: 17px; line-height: 1; transition: transform .16s; }
+.settings-section.collapse[open] .chev { transform: rotate(90deg); }
+.settings-section.collapse textarea { min-height: 90px; resize: vertical; line-height: 1.7; }
 .label-note { color: #676f7e; font-size: 11px; margin-left: 4px; }
 .field-action { display: flex; gap: 8px; align-items: center; }
 .field-action input { flex: 1; min-width: 0; }
