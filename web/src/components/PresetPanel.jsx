@@ -10,19 +10,20 @@ const MARKER_LABEL = {
   agentResults: 'Agent结果', main: '主指令', nsfw: 'NSFW', jailbreak: '越狱'
 }
 const MARKER_SOURCE = {
-  worldInfoBefore: '注入：世界书触发条目（前置位置）',
-  worldInfoAfter: '注入：世界书触发条目（后置位置）',
-  personaDescription: '本工具无对应用户角色数据，注入为空',
-  charDescription: '注入：世界书常驻（pinned）条目，等价于 ST 角色卡',
-  charPersonality: '信息已在常驻条目内容中，注入为空',
-  scenario: '注入：本书大纲与核心设定',
-  dialogueExamples: '本工具无对话示例数据，注入为空',
+  worldInfoBefore: '注入：世界书触发条目（前置位置）；留空则用预设自带内容',
+  worldInfoAfter: '注入：世界书触发条目（后置位置）；留空则用预设自带内容',
+  personaDescription: '本工具无用户人设数据；预设无内容时不注入',
+  charDescription: '注入：世界书常驻（pinned）条目，等价于 ST 角色卡；留空则用预设自带内容',
+  charPersonality: '本工具无独立性格字段；预设无内容时不注入',
+  scenario: '注入：本书大纲（设置 → 高级）；留空则用预设自带内容',
+  dialogueExamples: '本工具无对话示例数据；预设无内容时不注入',
   chatHistory: '注入：前情摘要 + 近章原文 + 当前章（作者注按深度插入）',
-  agentSystemPrompt: '注入：本书系统提示词（留空则不注入）',
+  agentSystemPrompt: '注入：本书系统提示词；留空则用预设自带内容',
   agentTask: '注入：本次生成模式指令与自定义要求',
-  agentResults: '注入为空',
-  main: '注入：本书系统提示词（留空则不注入）',
-  nsfw: '注入为空', jailbreak: '注入为空'
+  agentResults: '本工具无该数据；预设无内容时不注入',
+  main: '注入：本书系统提示词（设置 → 高级）；留空则用预设自带内容',
+  nsfw: '按预设自带内容与位置注入',
+  jailbreak: '按预设自带内容与位置注入'
 }
 const ROLE_LABEL = { system: 'System', user: 'User', assistant: 'Assistant' }
 
@@ -121,6 +122,7 @@ export default function PresetPanel({ project, onPatch, toast }) {
             </div>
             <div className="preset-hint">
               正文上下文会填入预设的 chatHistory 占位符；世界书常驻 / 触发条目分别填入 charDescription 与 worldInfo 占位符。
+              上面两个名字用于展开预设里的 <code>{'{char}'}</code> / <code>{'{user}'}</code> 宏，<b>不填也能用</b>，只是宏会展开为空。
             </div>
           </div>
         )}

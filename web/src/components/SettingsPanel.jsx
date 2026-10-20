@@ -163,7 +163,7 @@ function AdvancedForm({ project, onSave }) {
     <>
       {s.presetId && (
         <div className="hint-line">
-          已启用酒馆预设：系统提示词填入预设的 <b>main</b> 占位符，大纲填入 <b>scenario</b>；留空则不注入。
+          已启用酒馆预设：系统提示词会<b>覆盖</b>预设的 <b>main</b>（留空则使用预设自带内容），大纲覆盖 <b>scenario</b>。
         </div>
       )}
       <label>系统提示词</label>
@@ -171,7 +171,7 @@ function AdvancedForm({ project, onSave }) {
         rows={6}
         value={systemPrompt}
         onChange={e => setSystemPrompt(e.target.value)}
-        placeholder="留空则使用内置默认提示词（启用预设时留空 = 不注入 main）"
+        placeholder="留空则使用内置默认提示词；启用预设时留空 = 使用预设自带的 main"
       />
       <label>本书大纲 / 核心世界观（每次生成都注入）</label>
       <textarea

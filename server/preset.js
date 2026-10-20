@@ -169,8 +169,14 @@ function buildPresetMessages({ preset, project, chapter, mode = 'continue', sele
   const absolutes = []
   for (const p of preset.prompts) {
     if (!p.enabled) continue
-    // marker 注入数据源（数据内的 {{ 原样保留，防注入）；普通条目展开宏
-    const content = p.marker ? (M[p.identifier] ?? '') : expandContent(p.content, vars, names).text
+    // marker：优先用本项目数据源；数据源为空时回退到预设自带内容（贴近 ST 原生行为）
+    let content
+    if (p.marker) {
+      const fromData = M[p.identifier] ?? ''
+      content = fromData.trim() ? fromData : expandContent(p.content, vars, names).text
+    } else {
+      content = expandContent(p.content, vars, names).text
+    }
     if (!content.trim()) continue
     if (!p.marker && p.injection_position === 1) {
       absolutes.push({ role: p.role, content, depth: p.injection_depth })
