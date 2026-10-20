@@ -473,9 +473,6 @@ select { cursor: pointer; }
 .preset-bind-title { font-size: 13px; font-weight: 600; }
 .preset-bind-sub { font-size: 11px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
 .preset-bind-extra { margin-top: 12px; border-top: 1px dashed var(--border-2); padding-top: 12px; }
-.preset-names { display: flex; gap: 10px; }
-.preset-names label { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.preset-names label span { font-size: 11px; color: var(--muted); }
 .preset-hint {
   margin-top: 10px; font-size: 11px; color: var(--muted); line-height: 1.65;
   background: var(--panel); border-radius: var(--radius-sm); padding: 8px 10px;
@@ -612,6 +609,5 @@ select { cursor: pointer; }
   .char-count { display: none; }
   .preview-stats span { font-size: 11px; }
   .settings-section { padding: 14px; }
-  .preset-names { flex-direction: column; gap: 8px; }
   .gen-status { gap: 10px; }
 }

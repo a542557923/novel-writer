@@ -102,27 +102,9 @@ export default function PresetPanel({ project, onPatch, toast }) {
 
         {bound && (
           <div className="preset-bind-extra">
-            <div className="preset-names">
-              <label>
-                <span>{'{'}char{'}'} 名字</span>
-                <input
-                  placeholder="本书主角名"
-                  defaultValue={settings.presetCharName || ''}
-                  onBlur={e => { if (e.target.value !== (settings.presetCharName || '')) patchSettings({ presetCharName: e.target.value }) }}
-                />
-              </label>
-              <label>
-                <span>{'{'}user{'}'} 名字</span>
-                <input
-                  placeholder="本书用户名"
-                  defaultValue={settings.presetUserName || ''}
-                  onBlur={e => { if (e.target.value !== (settings.presetUserName || '')) patchSettings({ presetUserName: e.target.value }) }}
-                />
-              </label>
-            </div>
             <div className="preset-hint">
               正文上下文会填入预设的 chatHistory 占位符；世界书常驻 / 触发条目分别填入 charDescription 与 worldInfo 占位符。
-              上面两个名字用于展开预设里的 <code>{'{char}'}</code> / <code>{'{user}'}</code> 宏，<b>不填也能用</b>，只是宏会展开为空。
+              预设自带的 main / jailbreak 等内容在本书未覆盖时原样生效。
             </div>
           </div>
         )}
