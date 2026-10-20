@@ -61,8 +61,6 @@ async function extract(config, project, text, signal) {
   const raw = await chatOnce(config, {
     messages,
     model: config.extractModel || config.model,
-    temperature: 0.2,
-    maxTokens: 1500,
     signal
   })
   return { extraction: parseJsonLoose(raw), raw, messages }
@@ -84,8 +82,6 @@ async function postprocess(config, project, { delta = '', full = '' }, signal) {
   const raw = await chatOnce(config, {
     messages,
     model: config.extractModel || config.model,
-    temperature: 0.2,
-    maxTokens: 2600,
     signal
   })
   const parsed = parseJsonLoose(raw)

@@ -15,6 +15,7 @@ export const api = {
   saveConfig: (patch) => fetch('/api/config', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch)
   }).then(j),
+  listModels: (body) => post('/api/models', body),
 
   listProjects: () => fetch('/api/projects').then(j),
   getProject: (id) => fetch(`/api/projects/${id}`).then(j),

@@ -176,8 +176,6 @@ async function summarizeChapter(config, project, chapter, signal) {
       { role: 'user', content: `【章节】${chapter.title}\n\n【正文】\n${text}` }
     ],
     model: config.extractModel || config.model,
-    temperature: 0.3,
-    maxTokens: 800,
     signal
   })
   return (raw || '').trim()
@@ -197,8 +195,6 @@ async function maybeFold(config, project, { force = false, signal } = {}) {
       { role: 'user', content: parts.join('\n\n') }
     ],
     model: config.extractModel || config.model,
-    temperature: 0.3,
-    maxTokens: 1200,
     signal
   })
   const text = (raw || '').trim()

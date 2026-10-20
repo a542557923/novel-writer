@@ -15,21 +15,22 @@ const MARKER_SOURCE = {
   personaDescription: '本工具无对应用户角色数据，注入为空',
   charDescription: '注入：世界书常驻（pinned）条目，等价于 ST 角色卡',
   charPersonality: '信息已在常驻条目内容中，注入为空',
-  scenario: '注入：本书「设置 → 大纲与核心设定」',
+  scenario: '注入：本书大纲与核心设定',
   dialogueExamples: '本工具无对话示例数据，注入为空',
-  chatHistory: '注入：正文上下文（前面章节尾部 + 当前章，作者注按深度插入）',
-  agentSystemPrompt: '注入：本书「设置 → 系统提示词」（留空则不注入，不回退默认）',
+  chatHistory: '注入：前情摘要 + 近章原文 + 当前章（作者注按深度插入）',
+  agentSystemPrompt: '注入：本书系统提示词（留空则不注入）',
   agentTask: '注入：本次生成模式指令与自定义要求',
-  agentResults: '注入为空', main: '注入：本书「设置 → 系统提示词」（留空则不注入，不回退默认）',
+  agentResults: '注入为空',
+  main: '注入：本书系统提示词（留空则不注入）',
   nsfw: '注入为空', jailbreak: '注入为空'
 }
 const ROLE_LABEL = { system: 'System', user: 'User', assistant: 'Assistant' }
 
 // 酒馆预设：本书绑定 + 全局预设库管理
 export default function PresetPanel({ project, onPatch, toast }) {
-  const [list, setList] = useState(null)        // 预设库摘要
-  const [editing, setEditing] = useState(null)  // 展开编辑的预设 id
-  const [editData, setEditData] = useState(null) // 完整预设对象
+  const [list, setList] = useState(null)
+  const [editing, setEditing] = useState(null)
+  const [editData, setEditData] = useState(null)
   const settings = project.settings
 
   async function refreshList() {
@@ -50,7 +51,6 @@ export default function PresetPanel({ project, onPatch, toast }) {
     } catch (err) { toast('导入失败：' + err.message) }
   }
 
-  // 本书 settings 局部更新（presetId / presetCharName / presetUserName）
   async function patchSettings(patch) {
     onPatch(p => ({ ...p, settings: { ...p.settings, ...patch } }))
     try { await api.updateProject(project.id, { settings: patch }) }
@@ -77,13 +77,18 @@ export default function PresetPanel({ project, onPatch, toast }) {
     } catch (e) { toast('删除失败: ' + e.message) }
   }
 
-  const activeBound = settings.presetId && list?.some(ps => ps.id === settings.presetId)
+  const bound = settings.presetId && list?.find(ps => ps.id === settings.presetId)
 
   return (
     <div className="preset-panel">
-      {/* 本书绑定 */}
-      <div className="preset-bind">
-        <label className="preset-bind-label">本书使用的预设</label>
+      <section className="preset-bind-card">
+        <div className="preset-bind-head">
+          <div>
+            <div className="preset-bind-title">本书使用的预设</div>
+            <div className="preset-bind-sub">酒馆 Chat Completions 预设，决定提示词编排与宏</div>
+          </div>
+          <span className={'chip ' + (bound ? 'pinned' : 'plain')}>{bound ? '已启用' : '未启用'}</span>
+        </div>
         <select
           value={settings.presetId || ''}
           onChange={e => patchSettings({ presetId: e.target.value })}
@@ -93,13 +98,14 @@ export default function PresetPanel({ project, onPatch, toast }) {
             <option key={ps.id} value={ps.id}>{ps.name}（{ps.promptCount} 条）</option>
           ))}
         </select>
-        {activeBound && (
-          <>
+
+        {bound && (
+          <div className="preset-bind-extra">
             <div className="preset-names">
               <label>
                 <span>{'{'}char{'}'} 名字</span>
                 <input
-                  placeholder="本书主角名（替换预设中的 {char} 宏）"
+                  placeholder="本书主角名"
                   defaultValue={settings.presetCharName || ''}
                   onBlur={e => { if (e.target.value !== (settings.presetCharName || '')) patchSettings({ presetCharName: e.target.value }) }}
                 />
@@ -107,24 +113,23 @@ export default function PresetPanel({ project, onPatch, toast }) {
               <label>
                 <span>{'{'}user{'}'} 名字</span>
                 <input
-                  placeholder="本书用户名（替换预设中的 {user} 宏）"
+                  placeholder="本书用户名"
                   defaultValue={settings.presetUserName || ''}
                   onBlur={e => { if (e.target.value !== (settings.presetUserName || '')) patchSettings({ presetUserName: e.target.value }) }}
                 />
               </label>
             </div>
             <div className="preset-hint">
-              已启用预设：main 占位符 = 本书系统提示词，scenario = 大纲，作者注仍随正文生效。采样参数（温度等）不随预设导入，请到「设置」中配置。
+              正文上下文会填入预设的 chatHistory 占位符；世界书常驻 / 触发条目分别填入 charDescription 与 worldInfo 占位符。
             </div>
-          </>
+          </div>
         )}
-      </div>
+      </section>
 
-      {/* 预设库 */}
-      <div className="wb-toolbar">
-        <span className="wb-group-title">预设库</span>
+      <div className="panel-head">
+        <div className="panel-head-title">预设库<span>{list?.length ?? 0}</span></div>
         <label className="btn small primary">
-          导入预设
+          ＋ 导入预设
           <input type="file" accept=".json,application/json" hidden onChange={importFile} />
         </label>
       </div>
@@ -136,26 +141,33 @@ export default function PresetPanel({ project, onPatch, toast }) {
         </div>
       )}
 
-      {(list || []).map(ps => (
-        <div key={ps.id} className="preset-lib-item">
-          <div className="preset-lib-row" onClick={() => toggleEdit(ps.id)}>
-            <span className="wb-name">{ps.name}</span>
-            {settings.presetId === ps.id && <span className="chip pinned">本书使用中</span>}
-            <span className="wb-hint">{ps.promptCount} 条 · {new Date(ps.importedAt).toLocaleString()}</span>
-            <button className="btn small" onClick={e => { e.stopPropagation(); toggleEdit(ps.id) }}>
-              {editing === ps.id ? '收起' : '编辑条目'}
-            </button>
-            <button className="btn small danger" onClick={e => { e.stopPropagation(); removePreset(ps) }}>删除</button>
+      {(list || []).map(ps => {
+        const active = settings.presetId === ps.id
+        return (
+          <div key={ps.id} className={'preset-lib-item' + (active ? ' active' : '')}>
+            <div className="preset-lib-row" onClick={() => toggleEdit(ps.id)}>
+              <div className="preset-lib-main">
+                <div className="preset-lib-title">
+                  <span className="wb-name">{ps.name}</span>
+                  {active && <span className="chip pinned">使用中</span>}
+                </div>
+                <div className="preset-lib-meta">
+                  {ps.promptCount} 条提示词 · {new Date(ps.importedAt).toLocaleDateString()}
+                </div>
+              </div>
+              <div className="preset-lib-actions">
+                <button className="btn small" onClick={e => { e.stopPropagation(); toggleEdit(ps.id) }}>
+                  {editing === ps.id ? '收起' : '编辑'}
+                </button>
+                <button className="icon-btn del" title="删除预设" onClick={e => { e.stopPropagation(); removePreset(ps) }}>✕</button>
+              </div>
+            </div>
+            {editing === ps.id && editData && (
+              <PresetEditor key={editData.id} preset={editData} toast={toast} />
+            )}
           </div>
-          {editing === ps.id && editData && (
-            <PresetEditor
-              key={editData.id}
-              preset={editData}
-              toast={toast}
-            />
-          )}
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -173,16 +185,17 @@ function PresetEditor({ preset, toast }) {
 
   return (
     <div className="preset-editor">
-      <div className="preset-editor-note">条目开关为全局设置，影响所有选用此预设的作品。点击条目查看与编辑内容。</div>
+      <div className="preset-editor-note">条目开关为全局设置，影响所有选用此预设的作品。点击条目查看说明或编辑内容。</div>
       {prompts.map((p, i) => (
         <div key={p.identifier} className={'preset-item' + (p.enabled ? '' : ' disabled')}>
           <div className="preset-item-row" onClick={() => setExpanded(expanded === p.identifier ? null : p.identifier)}>
-            <input
-              type="checkbox"
-              checked={p.enabled}
-              onClick={e => e.stopPropagation()}
-              onChange={e => patchPrompt(p.identifier, { enabled: e.target.checked })}
-            />
+            <label className="preset-toggle" onClick={e => e.stopPropagation()}>
+              <input
+                type="checkbox"
+                checked={p.enabled}
+                onChange={e => patchPrompt(p.identifier, { enabled: e.target.checked })}
+              />
+            </label>
             <span className="preset-idx">{i + 1}</span>
             <span className="preset-name">{p.name || p.identifier}</span>
             <span className={'chip role role-' + p.role}>{ROLE_LABEL[p.role] || p.role}</span>
@@ -191,8 +204,8 @@ function PresetEditor({ preset, toast }) {
                 {MARKER_LABEL[p.identifier] || p.identifier}
               </span>
             )}
-            {!p.marker && p.injection_position === 1 && <span className="chip">@深度{p.injection_depth}</span>}
-            <span className="wb-hint">{(p.content || '').length} 字</span>
+            {!p.marker && p.injection_position === 1 && <span className="chip plain">@深度{p.injection_depth}</span>}
+            <span className="preset-len">{(p.content || '').length}</span>
           </div>
           {expanded === p.identifier && (
             p.marker ? (

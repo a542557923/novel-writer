@@ -16,9 +16,7 @@ const DEFAULT_CONFIG = {
   baseUrl: 'https://api.openai.com/v1',
   apiKey: '',
   model: '',
-  extractModel: '', // 留空则抽取复用主模型
-  temperature: 0.8,
-  maxTokens: 2000
+  extractModel: '' // 留空则整理复用主模型
 }
 
 const DEFAULT_SETTINGS = {
@@ -77,6 +75,9 @@ function load() {
   ensureDirs()
   const saved = readJson(CONFIG_FILE, null)
   if (saved) Object.assign(config, saved)
+  // 采样参数统一交由 API 默认值，历史配置中的字段直接丢弃
+  delete config.temperature
+  delete config.maxTokens
   for (const f of fs.readdirSync(PRESETS_DIR)) {
     if (!f.endsWith('.json')) continue
     const ps = presetMod.normalizePreset(readJson(path.join(PRESETS_DIR, f), null))
@@ -126,8 +127,8 @@ function getConfig() {
 }
 
 function updateConfig(patch) {
-  // apiKey 传掩码或空值时保留原值
-  const { apiKey, ...rest } = patch || {}
+  // apiKey 传掩码或空值时保留原值；temperature / maxTokens 已废弃，忽略
+  const { apiKey, temperature, maxTokens, ...rest } = patch || {}
   Object.assign(config, rest)
   if (apiKey && !/^[●]+$/.test(apiKey)) config.apiKey = apiKey
   if (apiKey === '') config.apiKey = ''

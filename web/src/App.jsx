@@ -16,6 +16,8 @@ export default function App() {
   const [toastMsg, setToastMsg] = useState(null)
   const [configOk, setConfigOk] = useState(true)
   const [loaded, setLoaded] = useState(false)
+  const [navOpen, setNavOpen] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   const toast = useCallback((msg) => {
     setToastMsg(msg)
@@ -47,6 +49,7 @@ export default function App() {
     const p = await api.getProject(id)
     setProject(p)
     setChapterId(p.chapters[0]?.id || null)
+    setNavOpen(false)
     if (p.chapters.length === 0) setTab('settings')
   }
 
@@ -140,16 +143,20 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={'app' + (navOpen ? ' nav-open' : '') + (panelOpen ? ' panel-open' : '')}>
       <header className="topbar">
+        <button className="icon-btn mobile-only menu-btn" title="章节目录" onClick={() => { setNavOpen(v => !v); setPanelOpen(false) }}>☰</button>
         <div className="topbar-title">
           <span className="logo">✒</span>
           <span className="book-name">{project.name}</span>
           <span className="book-meta">{project.chapters.length} 章 · 世界书 {project.worldbook.length} 条</span>
         </div>
         {!configOk && (
-          <button className="warn-chip" onClick={() => setTab('settings')}>未配置 AI 接口，点击设置</button>
+          <button className="warn-chip" onClick={() => { setTab('settings'); setPanelOpen(true) }}>未配置 AI 接口</button>
         )}
+        <button className="btn small mobile-only panel-btn" onClick={() => { setPanelOpen(v => !v); setNavOpen(false) }}>
+          面板
+        </button>
       </header>
       <div className="layout">
         <Sidebar
@@ -160,7 +167,7 @@ export default function App() {
           onDelete={deleteProject}
           chapters={project.chapters}
           chapterId={chapterId}
-          onSelectChapter={setChapterId}
+          onSelectChapter={id => { setChapterId(id); setNavOpen(false) }}
           onAddChapter={addChapter}
           onDeleteChapter={deleteChapter}
           onRenameChapter={renameChapter}
@@ -172,11 +179,12 @@ export default function App() {
           toast={toast}
           onWorldbookChanged={() => refreshProjectView()}
         />
-        <aside className="right-panel">
+        <aside className={'right-panel' + (panelOpen ? ' open' : '')}>
           <div className="tabs">
-            {[['worldbook', '世界书'], ['memory', '记忆'], ['preset', '预设'], ['preview', '注入预览'], ['settings', '设置']].map(([k, label]) => (
+            {[['worldbook', '世界书'], ['memory', '记忆'], ['preset', '预设'], ['preview', '预览'], ['settings', '设置']].map(([k, label]) => (
               <button key={k} className={'tab' + (tab === k ? ' active' : '')} onClick={() => setTab(k)}>{label}</button>
             ))}
+            <button className="icon-btn panel-close mobile-only" title="收起面板" onClick={() => setPanelOpen(false)}>✕</button>
           </div>
           {tab === 'worldbook' && (
             <WorldBook project={project} onPatch={patchProject} toast={toast} />
@@ -195,10 +203,14 @@ export default function App() {
               project={project}
               onSaveSettings={saveSettings}
               onSaveConfig={saveConfig}
+              toast={toast}
             />
           )}
         </aside>
       </div>
+      {(navOpen || panelOpen) && (
+        <div className="drawer-mask mobile-only" onClick={() => { setNavOpen(false); setPanelOpen(false) }} />
+      )}
       {toastMsg && <div className="toast">{toastMsg}</div>}
     </div>
   )

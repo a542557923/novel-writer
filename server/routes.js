@@ -3,7 +3,7 @@ const express = require('express')
 const store = require('./store')
 const { buildPrompt } = require('./prompt')
 const { buildPresetMessages, createOutputFilter } = require('./preset')
-const { chatStream } = require('./llm')
+const { chatStream, listModels } = require('./llm')
 const { extract, postprocess, applyExtraction } = require('./extractor')
 const memory = require('./memory')
 const queue = require('./queue')
@@ -12,6 +12,7 @@ const requestlog = require('./requestlog')
 const router = express.Router()
 
 const POSTPROCESS_DELAY_MS = 3500 // 生成完成后的后台整理延迟（公益站友好：避免连续密集请求）
+const POSTPROCESS_MIN_CHARS = 60  // 已生成文本不足该长度时不做后台整理
 
 const wrap = fn => (req, res) => {
   Promise.resolve(fn(req, res)).catch(e => {
@@ -76,6 +77,19 @@ const rebuildState = new Map()
 // ---------- 配置 ----------
 router.get('/config', (req, res) => res.json(store.getConfig()))
 router.put('/config', wrap((req, res) => res.json(store.updateConfig(req.body))))
+
+// 拉取可用模型列表（支持传入未保存的表单值；Key 为掩码时回退到已保存值）
+router.post('/models', wrap(async (req, res) => {
+  const cfg = store.rawConfig()
+  const body = req.body || {}
+  const baseUrl = String(body.baseUrl || cfg.baseUrl || '').trim()
+  let apiKey = String(body.apiKey || '').trim()
+  if (!apiKey || /^[●]+$/.test(apiKey)) apiKey = cfg.apiKey
+  if (!baseUrl) return res.status(400).json({ error: '请先填写 API 地址' })
+  if (!apiKey) return res.status(400).json({ error: '请先填写 API Key' })
+  const models = await listModels({ baseUrl, apiKey })
+  res.json({ models })
+}))
 
 // ---------- 酒馆预设库（全局） ----------
 router.get('/presets', (req, res) => res.json(store.listPresets()))
@@ -318,20 +332,21 @@ router.post('/projects/:id/generate', wrap(async (req, res) => {
 
   queue.beginGeneration()
   let finalText = null
+  let produced = ''   // 已生成的部分文本（成功/报错/中止都保留）
   let streamErr = null
   try {
     const text = await chatStream(cfg, {
       messages: built.messages,
       signal: controller.signal,
       onChunk: c => {
-        if (!filter) { send('chunk', { text: c }); return }
+        if (!filter) { produced += c; send('chunk', { text: c }); return }
         const out = filter.push(c)
-        if (out) { cleaned += out; send('chunk', { text: out }) }
+        if (out) { cleaned += out; produced += out; send('chunk', { text: out }) }
       }
     })
     if (filter) {
       const tail = filter.end()
-      if (tail) { cleaned += tail; send('chunk', { text: tail }) }
+      if (tail) { cleaned += tail; produced += tail; send('chunk', { text: tail }) }
     }
     finalText = filter ? cleaned : text
     send('done', { text: finalText, stats: built.stats })
@@ -347,14 +362,16 @@ router.post('/projects/:id/generate', wrap(async (req, res) => {
   }
 
   // 后台整理（世界书抽取 + 章节摘要，合并一次调用；参与全局串行队列）
+  // 注意：正文生成报错或中途停止时，只要已产出足够文本，仍然执行整理（不跳过）
   const autoOn = p.settings.autoExtract !== false && !p.settings.thriftyMode
-  if (!streamErr && autoOn && finalText && finalText.trim()) {
-    send('postprocess-queued', { delayMs: POSTPROCESS_DELAY_MS })
+  const deltaText = (finalText || produced || '').trim()
+  if (autoOn && deltaText.length >= POSTPROCESS_MIN_CHARS) {
+    send('postprocess-queued', { delayMs: POSTPROCESS_DELAY_MS, partial: !!streamErr })
     try {
       const applied = await queue.enqueue({
         key: `post:${p.id}:${chapterId}`,
         delayMs: POSTPROCESS_DELAY_MS,
-        payload: { delta: finalText },
+        payload: { delta: deltaText },
         mergePayload: (a, b) => ({ delta: `${a.delta}\n${b.delta}` }),
         executor: makePostprocessExecutor(p.id, chapterId)
       })

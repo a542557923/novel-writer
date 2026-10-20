@@ -94,8 +94,9 @@ export default function Editor({ project, chapter, onContent, toast, onWorldbook
       onChunk: (t) => setStreamText(p => p + t),
       onDone: (d) => settle(d.text),
       onError: (msg, aborted) => {
-        if (msg && !aborted) toast('生成失败: ' + msg)
-        if (aborted) settle(undefined, true) // 中途停止：保留已生成部分
+        if (msg && !aborted) toast('生成失败: ' + msg + '（已保留生成的部分）')
+        // 中止与报错都保留已生成的部分，保证后续后台整理与正文一致
+        settle(undefined, true)
       },
       onPostprocessQueued: () => setExtractInfo({ state: 'queued' }),
       onExtractStart: () => setExtractInfo({ state: 'running' }),
